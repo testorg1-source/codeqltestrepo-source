@@ -23,9 +23,9 @@ jobs:
       matrix:
         include:
           - language: java-kotlin
-            build-mode: manual  # Changed to manual for custom build commands
+            build-mode: manual  # Custom build for Java/Kotlin
           - language: javascript-typescript
-            build-mode: none  # Set to none for JavaScript/TypeScript
+            build-mode: none  # No build needed for JavaScript/TypeScript
           # Remove or modify Python if no Python code is present
           # - language: python
           #   build-mode: none  # No build needed for Python
@@ -46,6 +46,7 @@ jobs:
         shell: bash
         run: |
           echo "Executing custom build for Java/Kotlin..."
+          cd backend  # Change this if your build script is in a different directory
           ./gradlew build  # Replace with `mvn clean install` if using Maven
           echo "Build completed."
 
