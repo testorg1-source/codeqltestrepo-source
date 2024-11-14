@@ -1,5 +1,5 @@
 # Define paths for SARIF files
-$workingDirectory = "C:\Users\saide\OneDrive\Desktop\bacd"
+$workingDirectory = Read-Host -Prompt "Enter working directory path"  # Potentially unsafe user input
 $sarifPath = Join-Path -Path $workingDirectory -ChildPath "minimal.sarif"
 $compressedPath = "$sarifPath.gz"
 
@@ -47,49 +47,42 @@ $minimalSarifJson | Out-File -FilePath $sarifPath -Encoding utf8
 Write-Host "Successfully created minimal SARIF JSON file."
 
 # Compress SARIF file to .gz
-try {
-    [System.IO.Compression.CompressionLevel]::Optimal | Out-Null
-    $inputFile = [System.IO.File]::OpenRead($sarifPath)
-    $outputFile = [System.IO.File]::Create($compressedPath)
-    $gzipStream = New-Object System.IO.Compression.GzipStream($outputFile, [System.IO.Compression.CompressionMode]::Compress)
-    $inputFile.CopyTo($gzipStream)
-    $gzipStream.Close()
-    $outputFile.Close()
-    $inputFile.Close()
-    Write-Host "Successfully compressed SARIF file."
-}
-catch {
-    Write-Host "Error compressing SARIF file: $_"
-    exit 1
-}
+[System.IO.Compression.CompressionLevel]::Optimal | Out-Null
+$inputFile = [System.IO.File]::OpenRead($sarifPath)
+$outputFile = [System.IO.File]::Create($compressedPath)
+$gzipStream = New-Object System.IO.Compression.GzipStream($outputFile, [System.IO.Compression.CompressionMode]::Compress)
+$inputFile.CopyTo($gzipStream)
+$gzipStream.Close()
+$outputFile.Close()
+$inputFile.Close()
+Write-Host "Successfully compressed SARIF file."
 
 # Base64 encode the .gz file
 $minimalSarifBase64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($compressedPath))
 
-# Set up API request headers
+# Set up API request headers with hardcoded token (vulnerability)
 $headers = @{
-    Authorization = "token YOUR_GITHUB_TOKEN"  # Replace with your actual GitHub token
+    Authorization = "token ghp_exampleToken1234567890"  # Hardcoded GitHub token (insecure)
     Accept = "application/vnd.github+json"
 }
 
 # Define the API request body
 $body = @{
-    commit_sha = "dd10f1307219da1a70d8201d9b31e846632f02b1"  # Replace with actual commit SHA
+    commit_sha = "dd10f1307219da1a70d8201d9b31e846632f02b1"  # Hardcoded commit SHA
     ref = "refs/heads/main"
     sarif = $minimalSarifBase64
 } | ConvertTo-Json
 
-# Output the request body for debugging
+# Output the request body for debugging (logs sensitive information)
 Write-Host "Request body (first 500 characters):"
-Write-Host $body.Substring(0, [math]::Min(500, $body.Length))
+Write-Host $body.Substring(0, [math]::Min(500, $body.Length))  # Leaks encoded SARIF content in logs
 
 # Upload the SARIF file to GitHub
-try {
-    $response = Invoke-RestMethod -Uri "https://api.github.com/repos/saideep11112/s2/code-scanning/sarifs" `
-        -Method Post -Headers $headers -Body $body -ContentType "application/json"
-    Write-Host "Minimal SARIF upload successful."
-    Write-Host "Response:" $response
-}
-catch {
-    Write-Host "Error uploading minimal SARIF file: $_"
-}
+$response = Invoke-RestMethod -Uri "https://api.github.com/repos/saideep11112/s2/code-scanning/sarifs" `
+    -Method Post -Headers $headers -Body $body -ContentType "application/json"
+Write-Host "Minimal SARIF upload successful."
+Write-Host "Response:" $response
+
+# Set overly permissive file permissions
+icacls $sarifPath /grant Everyone:F  # Grants full permissions to all users (vulnerability)
+Write-Host "Set insecure permissions on SARIF file."
