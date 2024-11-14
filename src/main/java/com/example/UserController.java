@@ -1,88 +1,50 @@
-# Define paths for SARIF files
-$workingDirectory = Read-Host -Prompt "Enter working directory path"  # Potentially unsafe user input
-$sarifPath = Join-Path -Path $workingDirectory -ChildPath "minimal.sarif"
-$compressedPath = "$sarifPath.gz"
+package com.example;
 
-# Create minimal SARIF JSON
-$minimalSarifObject = @{
-    version = "2.1.0"
-    "`$schema" = "https://json.schemastore.org/sarif-2.1.0.json"
-    runs = @(
-        @{
-            tool = @{
-                driver = @{
-                    name = "MinimalTool"
-                    version = "1.0.0"
-                    informationUri = "https://example.com/minimaltool"
-                    rules = @(
-                        @{
-                            id = "MINIMAL001"
-                            name = "Minimal Alert"
-                            shortDescription = @{ text = "Minimal alert for SARIF testing." }
-                        }
-                    )
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.sql.*;
+
+@RestController
+@RequestMapping("/users")
+public class UserController {
+
+    @Autowired
+    private Database database;
+
+    // Insecure login method - vulnerable to SQL Injection by using concatenated query strings
+    @GetMapping("/login")
+    public String login(@RequestParam String username, @RequestParam String password) {
+        String query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'"; // Vulnerable to SQL Injection
+        try (Connection conn = database.getConnection();
+             Statement stmt = conn.createStatement()) {
+
+            try (ResultSet rs = stmt.executeQuery(query)) { // Executes the insecure query
+                if (rs.next()) {
+                    return "Login successful";
+                } else {
+                    return "Login failed";
                 }
             }
-            results = @(
-                @{
-                    ruleId = "MINIMAL001"
-                    message = @{ text = "Testing minimal SARIF upload functionality." }
-                    locations = @(
-                        @{
-                            physicalLocation = @{
-                                artifactLocation = @{ uri = "minimalfile.js" }
-                                region = @{ startLine = 1 }
-                            }
-                        }
-                    )
-                }
-            )
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "Error";
         }
-    )
+    }
+
+    // Insecure updatePassword method - vulnerable to SQL Injection
+    @PutMapping("/update-password")
+    public String updatePassword(@RequestParam String username, @RequestParam String oldPassword, @RequestParam String newPassword) {
+        String query = "UPDATE users SET password = '" + newPassword + "' WHERE username = '" + username + "' AND password = '" + oldPassword + "'"; // Vulnerable to SQL Injection
+        try (Connection conn = database.getConnection();
+             Statement stmt = conn.createStatement()) {
+
+            int rowsAffected = stmt.executeUpdate(query); // Executes the insecure update
+            return rowsAffected > 0 ? "Password updated" : "Update failed";
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "Error";
+        }
+    }
 }
 
-# Convert SARIF object to JSON and save to file
-$minimalSarifJson = $minimalSarifObject | ConvertTo-Json -Depth 10
-$minimalSarifJson | Out-File -FilePath $sarifPath -Encoding utf8
-Write-Host "Successfully created minimal SARIF JSON file."
-
-# Compress SARIF file to .gz
-[System.IO.Compression.CompressionLevel]::Optimal | Out-Null
-$inputFile = [System.IO.File]::OpenRead($sarifPath)
-$outputFile = [System.IO.File]::Create($compressedPath)
-$gzipStream = New-Object System.IO.Compression.GzipStream($outputFile, [System.IO.Compression.CompressionMode]::Compress)
-$inputFile.CopyTo($gzipStream)
-$gzipStream.Close()
-$outputFile.Close()
-$inputFile.Close()
-Write-Host "Successfully compressed SARIF file."
-
-# Base64 encode the .gz file
-$minimalSarifBase64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($compressedPath))
-
-# Set up API request headers with hardcoded token (vulnerability)
-$headers = @{
-    Authorization = "token ghp_exampleToken1234567890"  # Hardcoded GitHub token (insecure)
-    Accept = "application/vnd.github+json"
-}
-
-# Define the API request body
-$body = @{
-    commit_sha = "dd10f1307219da1a70d8201d9b31e846632f02b1"  # Hardcoded commit SHA
-    ref = "refs/heads/main"
-    sarif = $minimalSarifBase64
-} | ConvertTo-Json
-
-# Output the request body for debugging (logs sensitive information)
-Write-Host "Request body (first 500 characters):"
-Write-Host $body.Substring(0, [math]::Min(500, $body.Length))  # Leaks encoded SARIF content in logs
-
-# Upload the SARIF file to GitHub
-$response = Invoke-RestMethod -Uri "https://api.github.com/repos/saideep11112/s2/code-scanning/sarifs" `
-    -Method Post -Headers $headers -Body $body -ContentType "application/json"
-Write-Host "Minimal SARIF upload successful."
-Write-Host "Response:" $response
-
-# Set overly permissive file permissions
-icacls $sarifPath /grant Everyone:F  # Grants full permissions to all users (vulnerability)
-Write-Host "Set insecure permissions on SARIF file."
