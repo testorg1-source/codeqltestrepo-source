@@ -23,11 +23,12 @@ jobs:
       matrix:
         include:
           - language: java-kotlin
-            build-mode: autobuild  # Change to 'manual' if custom build commands are needed
+            build-mode: manual  # Changed to manual for custom build commands
           - language: javascript-typescript
-            build-mode: autobuild
-          - language: python
-            build-mode: none  # No build needed for Python; modify as necessary
+            build-mode: none  # Set to none for JavaScript/TypeScript
+          # Remove or modify Python if no Python code is present
+          # - language: python
+          #   build-mode: none  # No build needed for Python
 
     steps:
       - name: Checkout repository
@@ -40,13 +41,12 @@ jobs:
           build-mode: ${{ matrix.build-mode }}
           queries: "+security-extended,security-and-quality"
 
-      # Custom build step if 'manual' mode is set
-      - if: matrix.build-mode == 'manual'
+      # Custom build step for Java/Kotlin in manual mode
+      - if: matrix.build-mode == 'manual' && matrix.language == 'java-kotlin'
         shell: bash
         run: |
-          echo "Executing custom build commands for manual build mode..."
-          ./gradlew build  # Example for Java projects; replace with relevant build commands for other languages
-          # Add additional build commands as needed
+          echo "Executing custom build for Java/Kotlin..."
+          ./gradlew build  # Replace with `mvn clean install` if using Maven
           echo "Build completed."
 
       - name: Perform CodeQL Analysis
